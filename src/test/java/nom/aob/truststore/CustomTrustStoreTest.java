@@ -1,7 +1,5 @@
-package nom.aob.trustStore;
+package nom.aob.truststore;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpsConfigurator;
 import com.sun.net.httpserver.HttpsServer;
 import org.bouncycastle.asn1.x500.X500Name;

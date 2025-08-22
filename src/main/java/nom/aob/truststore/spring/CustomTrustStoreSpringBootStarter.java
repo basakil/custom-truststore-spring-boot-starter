@@ -1,6 +1,6 @@
-package nom.aob.spring.customTrustStoreSpringBootStarter;
+package nom.aob.truststore.spring;
 
-import nom.aob.trustStore.CustomTrustStore;
+import nom.aob.truststore.CustomTrustStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContextInitializer;

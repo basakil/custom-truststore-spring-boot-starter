@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>nom.aob.spring</groupId>
 	<artifactId>custom-truststore-spring-boot-starter</artifactId>
-	<version>1.0</version>
+	<version>1.0.1</version>
 	<name>custom-truststore-spring-boot-starter</name>
 	<description>Extends truststore ca certificates, programmatically. </description>
 	<url/>
