@@ -1,0 +1,2 @@
+org.springframework.context.ApplicationContextInitializer=\
+nom.aob.spring.customTrustStoreSpringBootStarter.CustomTrustStoreSpringBootStarter
