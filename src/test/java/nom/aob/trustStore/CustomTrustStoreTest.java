@@ -1,20 +1,18 @@
 package nom.aob.trustStore;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpsConfigurator;
+import com.sun.net.httpserver.HttpsServer;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
-
-import com.sun.net.httpserver.HttpServer;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpsServer;
-import com.sun.net.httpserver.HttpsConfigurator;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import javax.net.ssl.*;
 import java.io.File;
@@ -26,7 +24,9 @@ import java.net.InetSocketAddress;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.*;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.KeyStore;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
@@ -43,9 +43,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 public class CustomTrustStoreTest {
 
     private Path tempCustomCertDir;
-    private File tempCertFile;
-    private X509Certificate testCertificate;
-    private KeyPair keyPair;
     private HttpsServer server;
     private String serverUrl;
 
@@ -61,7 +58,7 @@ public class CustomTrustStoreTest {
         // 1. Generate a test certificate and a key pair for the mock server.
         KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
         keyPairGenerator.initialize(2048);
-        this.keyPair = keyPairGenerator.generateKeyPair();
+        KeyPair keyPair = keyPairGenerator.generateKeyPair();
 
         X500Name issuer = new X500Name("CN=Test Self-Signed CA, O=Example, L=Test, C=US");
         X500Name subject = new X500Name("CN=localhost"); // Server will be on localhost
@@ -73,19 +70,19 @@ public class CustomTrustStoreTest {
         X509v3CertificateBuilder builder = new JcaX509v3CertificateBuilder(
                 issuer, serial, notBefore, notAfter, subject, keyPair.getPublic());
 
-        this.testCertificate = new JcaX509CertificateConverter().getCertificate(builder.build(signer));
+        X509Certificate testCertificate = new JcaX509CertificateConverter().getCertificate(builder.build(signer));
 
         // Save the generated certificate to a file. This is what the client (the test) will use.
-        this.tempCertFile = this.tempCustomCertDir.resolve("test-cert.crt").toFile();
+        File tempCertFile = this.tempCustomCertDir.resolve("test-cert.crt").toFile();
         try (FileOutputStream fos = new FileOutputStream(tempCertFile)) {
-            fos.write(this.testCertificate.getEncoded());
+            fos.write(testCertificate.getEncoded());
         }
 
         // 2. Configure and start the temporary HTTPS server.
         KeyStore serverKeyStore = KeyStore.getInstance(KeyStore.getDefaultType());
         serverKeyStore.load(null, null);
         serverKeyStore.setKeyEntry("server-key", keyPair.getPrivate(), "changeit".toCharArray(),
-                new java.security.cert.Certificate[]{this.testCertificate});
+                new java.security.cert.Certificate[]{testCertificate});
 
         KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
         kmf.init(serverKeyStore, "changeit".toCharArray());
@@ -95,15 +92,12 @@ public class CustomTrustStoreTest {
 
         this.server = HttpsServer.create(new InetSocketAddress("localhost", 0), 0);
         this.server.setHttpsConfigurator(new HttpsConfigurator(serverSslContext));
-        this.server.createContext("/", new HttpHandler() {
-            @Override
-            public void handle(HttpExchange exchange) throws IOException {
-                String response = "Success!";
-                exchange.sendResponseHeaders(200, response.length());
-                OutputStream os = exchange.getResponseBody();
-                os.write(response.getBytes());
-                os.close();
-            }
+        this.server.createContext("/", exchange -> {
+            String response = "Success!";
+            exchange.sendResponseHeaders(200, response.length());
+            OutputStream os = exchange.getResponseBody();
+            os.write(response.getBytes());
+            os.close();
         });
         this.server.start();
 

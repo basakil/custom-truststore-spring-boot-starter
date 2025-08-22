@@ -1,4 +1,8 @@
 package nom.aob.trustStore;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
@@ -8,8 +12,6 @@ import java.io.InputStream;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A utility class to create an SSLContext by merging custom trust certificates
@@ -41,8 +43,8 @@ public class CustomTrustStore {
      * Constructs a CustomTrustStore instance that will merge custom certificates
      * with a specified original trust store.
      *
-     * @param extendedTruststorePath The path to the directory containing custom certificates.
-     * @param originalTruststorePath The path to the original trust store file.
+     * @param extendedTruststorePath     The path to the directory containing custom certificates.
+     * @param originalTruststorePath     The path to the original trust store file.
      * @param originalTruststorePassword The password for the original trust store.
      */
     public CustomTrustStore(String extendedTruststorePath,
