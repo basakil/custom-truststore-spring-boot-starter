@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>nom.aob.spring</groupId>
 	<artifactId>custom-truststore-spring-boot-starter</artifactId>
-	<version>1.0.1</version>
+	<version>1.1.1</version>
 	<name>custom-truststore-spring-boot-starter</name>
 	<description>Extends truststore ca certificates, programmatically. </description>
 	<url/>
@@ -22,10 +22,11 @@
 	</scm>
 
 	<properties>
-		<junit.version>5.13.4</junit.version>
-		<bouncycastle.version>1.81</bouncycastle.version>
-		<spring-context.version>6.2.10</spring-context.version>
-		<slf4j.version>2.0.17</slf4j.version>
+		<!--		prefixed with "custom-truststore" to differentiate it with dependent parent properties.-->
+		<custom-truststore-junit.version>5.13.4</custom-truststore-junit.version>
+		<custom-truststore-bouncycastle.version>1.81</custom-truststore-bouncycastle.version>
+		<custom-truststore-slf4j.version>2.0.17</custom-truststore-slf4j.version>
+		<custom-truststore-sbringboot-version>3.5.4</custom-truststore-sbringboot-version>
 	</properties>
 
 
@@ -34,7 +35,7 @@
 			<dependency>
 				<groupId>org.junit</groupId>
 				<artifactId>junit-bom</artifactId>
-				<version>${junit.version}</version>
+				<version>${custom-truststore-junit.version}</version>
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>
@@ -46,14 +47,28 @@
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
-            <version>${spring-context.version}</version>
+            <version>6.2.10</version>
             <scope>provided</scope>
         </dependency>
 
 		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-autoconfigure</artifactId>
+			<version>${custom-truststore-sbringboot-version}</version>
+			<scope>provided</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-configuration-processor</artifactId>
+			<version>${custom-truststore-sbringboot-version}</version>
+			<scope>provided</scope>
+		</dependency>
+
+		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
-			<version>${slf4j.version}</version>
+			<version>${custom-truststore-slf4j.version}</version>
 			<scope>provided</scope>
 		</dependency>
 
@@ -72,13 +87,13 @@
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
 			<artifactId>bcprov-jdk18on</artifactId>
-			<version>${bouncycastle.version}</version>
+			<version>${custom-truststore-bouncycastle.version}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
 			<artifactId>bcpkix-jdk18on</artifactId>
-			<version>${bouncycastle.version}</version>
+			<version>${custom-truststore-bouncycastle.version}</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

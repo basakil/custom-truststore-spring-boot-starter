@@ -1,0 +1,125 @@
+package nom.aob.truststore.spring;
+
+import nom.aob.truststore.CustomTrustStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.AutoConfigureOrder;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.core.PriorityOrdered;
+import org.springframework.core.env.Environment;
+
+import org.springframework.beans.factory.InitializingBean;
+import javax.net.ssl.SSLContext;
+import java.io.File;
+
+/**
+ * Auto-configuration class for CustomTrustStore that automatically initializes
+ * the SSL context with custom certificates during Spring Boot startup.
+ * 
+ * This configuration runs very early in the Spring Boot lifecycle, before most beans are created.
+ * Bean annotations are disabled, since we are using the initializer method, now..
+ *      Users can make a new starter with this class, or include this class in their own projects.
+ */
+@Configuration
+@EnableConfigurationProperties(CustomTrustStoreProperties.class)
+@ConditionalOnProperty(prefix = "truststore.custom", name = "enabled", havingValue = "true", matchIfMissing = true)
+@AutoConfigureOrder(Integer.MIN_VALUE)
+@Order(Integer.MIN_VALUE)
+public class CustomTrustStoreAutoConfiguration implements InitializingBean, PriorityOrdered {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(CustomTrustStoreAutoConfiguration.class);
+
+    private final CustomTrustStoreProperties properties;
+    private final Environment environment;
+    private CustomTrustStore customTrustStoreInstance;
+    private SSLContext mergedSSLContext;
+
+    public CustomTrustStoreAutoConfiguration(CustomTrustStoreProperties properties, Environment environment) {
+        this.properties = properties;
+        this.environment = environment;
+    }
+
+    /**
+     * Initialize the custom trust store during Spring Boot startup.
+     * This method runs after the ApplicationContext is created but before any beans are initialized.
+     */
+    @Override
+    public void afterPropertiesSet() {
+        LOGGER.info("Initializing CustomTrustStore auto-configuration...");
+
+        // Determine the certificates directory path
+        String certsDirPath = properties.getMergeDir();
+        if (certsDirPath == null || certsDirPath.trim().isEmpty()) {
+            certsDirPath = new File("truststore/custom/merge").getAbsolutePath();
+            LOGGER.info("Using default certificates directory: {}", certsDirPath);
+        } else {
+            LOGGER.info("Using certificates directory from configuration: {}", certsDirPath);
+        }
+
+        // Create and initialize the custom trust store
+        this.customTrustStoreInstance = new CustomTrustStore(certsDirPath);
+        
+        try {
+            this.mergedSSLContext = this.customTrustStoreInstance.getMergedSSLContext();
+            if (this.mergedSSLContext != null) {
+                SSLContext.setDefault(this.mergedSSLContext);
+                LOGGER.info("Successfully initialized custom trust store and set as default SSLContext");
+            } else {
+                throw new IllegalStateException("CustomTrustStore.getMergedSSLContext() returned null");
+            }
+        } catch (Exception ex) {
+            if (properties.isFailOnError()) {
+                LOGGER.error("Failed to initialize custom trust store. Application will exit due to fail-on-error=true", ex);
+                throw new RuntimeException("Failed to initialize custom trust store", ex);
+            } else {
+                LOGGER.error("Failed to initialize custom trust store from directory: {}. Continuing with default trust store.", certsDirPath, ex);
+            }
+        }
+    }
+
+    /**
+     * Bean that provides access to the CustomTrustStore instance for other components.
+     * Returns the already-initialized instance to avoid duplicate certificate merging.
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "truststore.custom", name = "expose-bean", havingValue = "true", matchIfMissing = false)
+    public CustomTrustStore customTrustStore() {
+        if (this.customTrustStoreInstance == null) {
+            LOGGER.warn("CustomTrustStore bean requested but not yet initialized. This should not happen in normal startup order.");
+            // Fallback: create a new instance if somehow this is called before initialization
+            String certsDirPath = properties.getMergeDir();
+            if (certsDirPath == null || certsDirPath.trim().isEmpty()) {
+                certsDirPath = new File("truststore/custom/merge").getAbsolutePath();
+            }
+            return new CustomTrustStore(certsDirPath);
+        }
+        return this.customTrustStoreInstance;
+    }
+
+    /**
+     * Bean that provides access to the already-merged SSL context.
+     * This avoids calling getMergedSSLContext() again on the CustomTrustStore instance.
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "truststore.custom", name = "expose-bean", havingValue = "true", matchIfMissing = false)
+    public SSLContext customSSLContext() {
+        if (this.mergedSSLContext == null) {
+            LOGGER.warn("Custom SSL context requested but not yet initialized. This should not happen in normal startup order.");
+            return null;
+        }
+        return this.mergedSSLContext;
+    }
+
+    /**
+     * Implement PriorityOrdered to ensure this configuration runs before all other beans.
+     * Returns the highest priority (lowest number) to run first.
+     */
+    @Override
+    public int getOrder() {
+        return Integer.MIN_VALUE;
+    }
+}

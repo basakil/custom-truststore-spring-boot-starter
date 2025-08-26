@@ -112,8 +112,8 @@ public class CustomTrustStore {
             return sslContext;
 
         } catch (Exception e) {
-            LOGGER.error("Fatal error during trust store configuration: {}", e.getMessage());
-            throw new IllegalStateException("Failed to configure trust store at startup.", e);
+            LOGGER.error("Error during trust store configuration: {}", e.getMessage());
+            throw new IllegalStateException("Failed to configure trust store.", e);
         }
     }
 }
