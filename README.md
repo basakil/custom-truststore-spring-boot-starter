@@ -1,87 +1,232 @@
-# Custom Trust Store Spring Boot Starter
+# Custom TrustStore Spring Boot Starter
 
-A Spring Boot starter that automatically merges custom CA certificates with the JRE's default trust store during application startup. This allows applications to trust custom certificates without modifying the system's default trust store.
+A Spring Boot starter that extends the default JRE truststore with custom CA certificates. This allows your Spring Boot application to trust both the default Java certificates and your custom certificates without overwriting the original truststore.
 
-## Features
+## What Happens When You Include This Dependency
 
-- **Automatic Integration**: Works automatically when included as a dependency - no manual configuration required
-- **Early Initialization**: Runs before most Spring beans are created, ensuring SSL context is ready for all components
-- **Flexible Configuration**: Configurable certificate directory and error handling behavior
-- **Non-Destructive**: Preserves the original JRE trust store while adding custom certificates
-- **Runtime Merging**: Certificates are merged at runtime, not at build time
+**Simply including this starter in your `pom.xml` will automatically:**
 
-## Usage
+1. **Auto-detect and load** custom certificates from `truststore/custom/merge/` directory
+2. **Merge** your custom certificates with the JRE's default `cacerts` truststore
+3. **Set** the merged truststore as the default SSL context
+4. **Make** your application trust both default and custom certificates automatically
+
+**No code changes required** - it just works out of the box!
+
+## Overview of Usage Approaches
+
+This starter provides **three different approaches** to initialize custom truststore certificates, each with different levels of control and complexity:
+
+1. **Auto-Configuration** (Simplest - Recommended for Most Cases) - Just include dependency, works automatically
+2. **ApplicationContextInitializer** (Most Control) - Manual initialization in main method
+3. **Standalone Usage** (Non-Spring Boot) - Use `CustomTrustStore.java` directly
+
+## Quick Start
 
 ### 1. Add Dependency
-
-Include this starter in your Spring Boot project's `pom.xml`:
 
 ```xml
 <dependency>
     <groupId>nom.aob.spring</groupId>
     <artifactId>custom-truststore-spring-boot-starter</artifactId>
-    <version>1.0.7</version>
+    <version>1.1.1</version>
 </dependency>
 ```
 
-### 2. Place Custom Certificates
+### 2. Place Certificates
 
-Place your custom CA certificates (`.crt`, `.cer`, or `.pem` files) in one of these locations:
+Put your custom CA certificates in the `truststore/custom/merge/` directory:
 
-- **Default**: `truststore/custom/merge/` directory in your project root
-- **Custom**: Configure using `truststore.custom.merge-dir` property
-
-### 3. Configuration (Optional)
-
-You can customize the behavior using these properties in your `application.yml` or `application.properties`:
-
-```yaml
-truststore:
-  custom:
-    enabled: true                    # Enable/disable the starter (default: true)
-    merge-dir: /path/to/certs       # Custom certificates directory
-    fail-on-error: false            # Whether to fail startup on error (default: false)
-    expose-bean: false              # Expose CustomTrustStore as Spring bean (default: false)
+```
+your-app/
+├── truststore/
+│   └── custom/
+│       └── merge/
+│           ├── internal-ca.crt
+│           ├── corporate-ca.cer
+│           └── development-ca.pem
+├── src/
+├── pom.xml
+└── README.md
 ```
 
-## How It Works
+### 3. That's It!
 
-1. **Auto-Detection**: Spring Boot automatically detects and loads this starter
-2. **Early Initialization**: The starter initializes during the `InitializingBean.afterPropertiesSet()` phase
-3. **Certificate Loading**: Loads all certificates from the configured directory
-4. **Trust Store Merging**: Merges custom certificates with the JRE's default `cacerts`
-5. **SSL Context Setup**: Sets the merged trust store as the default SSL context
-6. **Application Ready**: Your application now trusts both default and custom certificates
+Your application now automatically trusts both default Java certificates and your custom certificates. No additional code needed!
 
-## Example
+## Usage Examples
 
-### Basic Usage (No Configuration Required)
+### Approach 1: Auto-Configuration (Simplest - Recommended)
+
+**Just include the dependency and it works automatically!**
+
+```xml
+<!-- Add to your pom.xml -->
+<dependency>
+    <groupId>nom.aob.spring</groupId>
+    <artifactId>custom-truststore-spring-boot-starter</artifactId>
+    <version>1.1.1</version>
+</dependency>
+```
 
 ```java
 @SpringBootApplication
 public class MyApplication {
     public static void main(String[] args) {
+        // No additional code needed!
         SpringApplication.run(MyApplication.class, args);
     }
 }
 ```
 
-Just include the dependency and place certificates in `truststore/custom/merge/` - that's it!
+**What happens automatically:**
+1. ✅ **Auto-detects** certificates in `truststore/custom/merge/` directory
+2. ✅ **Merges** with JRE's default `cacerts` truststore
+3. ✅ **Sets** as default SSL context
+4. ✅ **Makes** your app trust both default and custom certificates
 
-### Custom Configuration
+### Approach 2: ApplicationContextInitializer (Most Control)
 
-```yaml
-# application.yml
-truststore:
-  custom:
-    merge-dir: /etc/myapp/certificates
-    fail-on-error: true
-    expose-bean: true
+The `CustomTrustStoreSpringBootInitializer` provides the most control over when the custom truststore is initialized. It runs before the ApplicationContext is created, ensuring SSL context is ready for all beans.
+
+#### Basic Usage in Main Method
+
+```java
+import nom.aob.truststore.spring.CustomTrustStoreSpringBootInitializer;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class MyApplication {
+
+    public static void main(String[] args) {
+        SpringApplication app = new SpringApplication(MyApplication.class);
+        app.addInitializers(new CustomTrustStoreSpringBootInitializer());
+        app.run(args);
+    }
+}
 ```
 
-### Accessing the CustomTrustStore Bean
+#### Alternative: Using SpringApplicationBuilder
 
-If you enable `expose-bean: true`, you can inject the `CustomTrustStore` or the pre-merged `SSLContext`:
+```java
+import nom.aob.truststore.spring.CustomTrustStoreSpringBootInitializer;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class MyApplication {
+
+    public static void main(String[] args) {
+        new SpringApplicationBuilder(MyApplication.class)
+            .initializers(new CustomTrustStoreSpringBootInitializer())
+            .run(args);
+    }
+}
+```
+
+### Approach 3: Standalone Usage (Non-Spring Boot Projects)
+
+**For non-Spring Boot projects, use the core `CustomTrustStore.java` directly:**
+
+#### Basic Standalone Usage
+
+```java
+import nom.aob.truststore.CustomTrustStore;
+import javax.net.ssl.SSLContext;
+
+public class MyStandaloneApplication {
+    public static void main(String[] args) {
+        // Initialize custom truststore
+        CustomTrustStore customTrustStore = new CustomTrustStore("truststore/custom/merge");
+        
+        // Get merged SSL context
+        SSLContext sslContext = customTrustStore.getMergedSSLContext();
+        
+        // Set as default SSL context
+        SSLContext.setDefault(sslContext);
+        
+        // Now your application trusts both default and custom certificates
+        // ... rest of your application code
+    }
+}
+```
+
+#### Advanced Standalone Usage
+
+```java
+import nom.aob.truststore.CustomTrustStore;
+import javax.net.ssl.SSLContext;
+
+public class MyAdvancedApplication {
+    public static void main(String[] args) {
+        // Use custom original truststore
+        CustomTrustStore customTrustStore = new CustomTrustStore(
+            "truststore/custom/merge",                    // Custom certificates directory
+            "/path/to/original/truststore.jks",          // Original truststore file
+            "original-password"                           // Original truststore password
+        );
+        
+        // Get merged SSL context
+        SSLContext sslContext = customTrustStore.getMergedSSLContext();
+        
+        // Set as default SSL context
+        SSLContext.setDefault(sslContext);
+        
+        // ... rest of your application code
+    }
+}
+```
+
+## Configuration Properties
+
+You can customize the behavior using these application properties:
+
+### `truststore.custom.enabled`
+- **Default**: `true`
+- **Description**: Enable/disable the custom truststore functionality. When disabled, the initializer will just return, without changing anything.
+- **Example**: `truststore.custom.enabled=false`
+
+### `truststore.custom.merge-dir`
+- **Default**: `truststore/custom/merge`
+- **Description**: Directory path containing custom CA certificates
+- **Example**: `truststore.custom.merge-dir=/etc/myapp/certificates`
+
+### `truststore.custom.fail-on-error`
+- **Default**: `false`
+- **Description**: Whether to fail the startup initializer, if certificate loading fails. Note that, in this case, the initializer throws an exception but ApplicationContextRunner (which handles all initializers) skips to the next initializer, by default, without exiting the application.
+- **Example**: `truststore.custom.fail-on-error=true`
+
+### `truststore.custom.expose-bean`
+- **Default**: `false`
+- **Description**: Whether to expose `CustomTrustStore` and merged `SSLContext` as Spring beans. Note that, we're not exposing any beans by default, for now. You can enable and use CustomTrustStoreAutoConfiguration.java.disabled for this functionality.
+- **Example**: `truststore.custom.expose-bean=true`
+
+## Configuration Examples
+
+### application.yml
+```yaml
+truststore:
+  custom:
+    enabled: true
+    merge-dir: "truststore/custom/merge"
+    fail-on-error: false
+    expose-bean: false
+```
+
+### application.properties
+```properties
+truststore.custom.enabled=true
+truststore.custom.merge-dir=truststore/custom/merge
+truststore.custom.fail-on-error=false
+truststore.custom.expose-bean=false
+```
+
+## Advanced Usage
+
+### Accessing the CustomTrustStore Bean (When expose-bean=true)
+
+If you enable `expose-bean: true`, you can inject the custom truststore:
 
 ```java
 @Component
@@ -106,48 +251,76 @@ public class MyService {
 }
 ```
 
-**Note**: The starter is optimized to avoid duplicate certificate merging. Both beans return the same pre-initialized instances, ensuring certificates are only loaded and merged once during startup.
+## Supported Certificate Formats
 
-## Certificate File Types
-
-The starter supports these certificate file formats:
 - `.crt` - Certificate files
 - `.cer` - Certificate files  
 - `.pem` - PEM encoded certificates
 
-## Error Handling
+## How It Works
 
-- **Default Behavior**: If certificate loading fails, the application continues with the default trust store
-- **Fail on Error**: Set `truststore.custom.fail-on-error=true` to make startup fail if certificate loading fails
-- **Logging**: All operations are logged with appropriate log levels
+1. **Auto-Detection**: Spring Boot automatically detects and loads this starter
+2. **Property Binding**: Uses Spring Boot's `Binder` to automatically map properties
+3. **Certificate Loading**: Loads all certificates from the configured directory
+4. **Trust Store Merging**: Merges custom certificates with the JRE's default `cacerts`
+5. **SSL Context Setup**: Sets the merged trust store as the default SSL context
+6. **Application Ready**: Your application now trusts both default and custom certificates
 
-## Requirements
+## Expected Logs
 
-- Java 8 or higher
-- Spring Boot 2.x or 3.x
-- Certificates must be valid X.509 format
+When you start the application, you should see:
+
+```
+INFO  CustomTrustStoreSpringBootInitializer - CustomTrustStore is enabled. Initializing via ApplicationContextInitializer...
+INFO  CustomTrustStoreSpringBootInitializer - Using certificates directory from configuration: truststore/custom/merge
+INFO  CustomTrustStore - Merging custom certificates from truststore/custom/merge with original trust store.
+INFO  CustomTrustStore - Successfully added certificate: internal-ca.crt
+INFO  CustomTrustStore - Successfully added certificate: corporate-ca.cer
+INFO  CustomTrustStore - Successfully added certificate: development-ca.pem
+INFO  CustomTrustStore - Custom certificates are successfully merged into the new SSLContext.
+INFO  CustomTrustStoreSpringBootInitializer - Successfully initialized custom trust store and set as default SSLContext
+INFO  SpringApplication - Starting SpringApplication using Java ...
+...
+```
+
+## Benefits of Each Approach
+
+### Auto-Configuration (Approach 1)
+1. **Zero Code**: Works automatically when included
+2. **Spring Integration**: Full Spring Boot lifecycle integration
+3. **Simple**: Just add dependency and place certificates
+4. **Production Ready**: Handles errors gracefully
+
+### ApplicationContextInitializer (Approach 2)
+1. **Early Initialization**: Runs before ApplicationContext is created
+2. **Spring Integration**: Uses Spring Boot's property binding system
+3. **Configuration Support**: Full access to application properties
+4. **Bean Ready**: SSL context is ready when beans are created
+5. **Standard Pattern**: Follows Spring Boot best practices
+6. **Property Binding**: Automatically binds properties to CustomTrustStoreProperties
+7. **Environment Access**: Can access all Spring Boot environment properties
+
+### Standalone Usage (Approach 3)
+1. **No Dependencies**: Works without Spring Boot
+2. **Full Control**: Initialize exactly when you want
+3. **Simple Integration**: Just a few lines of code
+4. **Framework Agnostic**: Can be used in any Java application
 
 ## Troubleshooting
 
-### Certificates Not Loading
+- **No logs?** Check that the dependency (and slf4j dependency with implementation) is properly included
+- **Directory not found?** Ensure the certificates directory exists
+- **Certificates not loading?** Verify file extensions are `.crt`, `.cer`, or `.pem`
+- **SSL errors?** Check that certificates are valid X.509 format
+- **Properties not reading?** Ensure property names match exactly (e.g., `truststore.custom.merge-dir`)
+- **Initializer not running?** Verify you're calling `app.addInitializers()` before `app.run()`
 
-1. Check the directory path in logs
-2. Ensure certificates have proper file extensions (`.crt`, `.cer`, `.pem`)
-3. Verify file permissions
-4. Check for certificate format errors in logs
+## Benefits
 
-### SSL Context Not Updated
-
-1. Verify the starter is being loaded (check startup logs)
-2. Ensure no other code is overriding the SSL context after startup
-3. Check that certificates are being loaded successfully
-
-### Application Fails to Start
-
-1. Set `truststore.custom.fail-on-error=false` to continue on errors
-2. Check certificate directory exists and is accessible
-3. Verify certificate files are valid X.509 format
-
-## License
-
-This project is licensed under the same terms as your project.
+- ✅ **Multiple Approaches**: Choose the level of control you need
+- ✅ **Zero Code Option**: Works automatically when included
+- ✅ **No Overwriting**: Preserves original JRE truststore
+- ✅ **Flexible**: Configurable via application properties
+- ✅ **Spring Integration**: Full Spring Boot lifecycle integration
+- ✅ **Standalone Ready**: Can be used without Spring Boot
+- ✅ **Production Ready**: Handles errors gracefully
